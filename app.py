@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 import time
 from datetime import date, timedelta
@@ -26,7 +27,7 @@ TAB_ICONS = {
     "Practice Lab": "⚗️",
     "Analytics": "📊",
     "Mistake Journal": "📝",
-    "Mastery Heatmap": "🗺️",
+    "Topic Heatmap": "🗺️",
     "Revision": "🔁",
     "Flashcards": "🃏",
     "QOTD + Paper Builder": "🏗️",
@@ -506,6 +507,60 @@ def _subject_text(item: dict[str, Any]) -> str:
 def _topic_text(item: dict[str, Any]) -> str:
     return str(item.get("topic") or "Unknown")
 
+
+def _clean_option_text(value: Any) -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    return text.strip(" -;:")
+
+
+def _extract_numbered_options(text: str) -> list[str]:
+    compact = re.sub(r"\s+", " ", str(text or "")).strip()
+    if not compact:
+        return []
+
+    compact = re.split(r"\bsol(?:ution)?\.?\b", compact, maxsplit=1, flags=re.IGNORECASE)[0].strip()
+
+    matches = list(re.finditer(r"\(\s*([1-4])\s*\)", compact))
+    if len(matches) < 2:
+        matches = list(re.finditer(r"(?<!\d)([1-4])\s*[\).]", compact))
+    if len(matches) < 2:
+        return []
+
+    options: list[str] = []
+    for idx, match in enumerate(matches):
+        start = match.end()
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(compact)
+        chunk = _clean_option_text(compact[start:end])
+        if chunk:
+            options.append(chunk)
+        if len(options) >= 4:
+            break
+
+    return options
+
+
+def _question_options(item: dict[str, Any]) -> list[str]:
+    options: list[str] = []
+    raw_options = item.get("options", [])
+
+    if isinstance(raw_options, list):
+        for value in raw_options:
+            cleaned = _clean_option_text(value)
+            if cleaned:
+                options.append(cleaned)
+
+    if len(options) == 1:
+        extracted = _extract_numbered_options(options[0])
+        if extracted:
+            options = extracted
+
+    if len(options) < 2:
+        extracted = _extract_numbered_options(_question_text(item))
+        if extracted:
+            options = extracted
+
+    return options[:4]
+
 def _status_badge(status: str) -> str:
     value = str(status or "").strip().lower()
     if value == "pass":
@@ -753,8 +808,8 @@ def _render_question_bank(user_name: str, options: dict[str, list[Any]]) -> None
         with st.expander(f"{diff_emoji} Q{qid} · {subject} · {topic}"):
             st.markdown(_question_text(item))
 
-            options_list = item.get("options", [])
-            if isinstance(options_list, list) and options_list:
+            options_list = _question_options(item)
+            if options_list:
                 st.markdown("**Options:**")
                 for idx, option in enumerate(options_list, start=1):
                     st.markdown(f"&nbsp;&nbsp;**{idx}.** {option}")
@@ -991,24 +1046,19 @@ def _render_practice_lab(user_name: str, options: dict[str, list[Any]]) -> None:
             )
             st.markdown(_question_text(question))
 
-            opts = question.get("options", [])
-            if isinstance(opts, list) and opts:
-                st.markdown("**Choose your answer:**")
-                option_labels = ["Skip"] + [f"{i}. {o}" for i, o in enumerate(opts, start=1)]
+            opts = _question_options(question)
+            if opts:
+                st.markdown("**Options:**")
+                for opt_idx, option_text in enumerate(opts, start=1):
+                    st.markdown(f"{opt_idx}. {option_text}")
 
-                selected_display = st.radio(
-                    "Answer",
-                    option_labels,
-                    key=f"practice-display-{session_id}-{qid}",
-                    label_visibility="collapsed",
-                    horizontal=False,
-                )
-                if selected_display == "Skip":
-                    st.session_state[choice_key] = "Skip"
-                else:
-                    st.session_state[choice_key] = str(option_labels.index(selected_display))
-            else:
-                st.selectbox("Selected option", ["Skip", "1", "2", "3", "4"], key=choice_key)
+            st.radio(
+                "Select option",
+                ["Skip", "1", "2", "3", "4"],
+                key=choice_key,
+                horizontal=True,
+                label_visibility="collapsed",
+            )
 
             st.number_input("Time spent (sec)", min_value=0, max_value=7200, step=5, key=time_key)
             st.markdown("---")
@@ -1180,10 +1230,11 @@ def _render_mistake_journal(user_name: str) -> None:
 
 
 # ─────────────────────────────────────────────────────────────
-# MASTERY HEATMAP
+# TOPIC HEATMAP
 # ─────────────────────────────────────────────────────────────
 
 def _render_mastery_heatmap(user_name: str) -> None:
+    _section("Topic Heatmap")
     min_attempts = st.slider("Min attempts per topic", min_value=1, max_value=10, value=2, step=1)
 
     with st.spinner("Building heatmap…"):
@@ -1196,7 +1247,7 @@ def _render_mastery_heatmap(user_name: str) -> None:
         st.error(f"📡 {error}")
         return
     if not isinstance(payload, dict):
-        _empty_state("🗺️", "No mastery data yet. Submit more sessions to see your heatmap.")
+        _empty_state("🗺️", "No topic data yet. Submit more sessions to see your heatmap.")
         return
 
     items_df = pd.DataFrame(payload.get("items", []))
@@ -1475,8 +1526,8 @@ def _render_qotd_and_paper_builder(user_name: str, options: dict[str, list[Any]]
             with st.expander(f"Today's Question · Q{qid} · {_subject_text(question)} · {_topic_text(question)}", expanded=True):
                 st.markdown(_question_text(question))
 
-                opts = question.get("options", [])
-                if isinstance(opts, list) and opts:
+                opts = _question_options(question)
+                if opts:
                     for idx, option in enumerate(opts, start=1):
                         st.markdown(f"**{idx}.** {option}")
 
