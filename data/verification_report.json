@@ -1,0 +1,89 @@
+{
+  "generated_at": "2026-04-14T03:05:39+00:00",
+  "project_root": "C:\\Users\\katuk\\OneDrive\\Desktop\\projects\\vibe\\neet",
+  "status": "warn",
+  "passed": 5,
+  "warnings": 1,
+  "failed": 0,
+  "checks": [
+    {
+      "name": "Python Syntax",
+      "status": "pass",
+      "message": "Core Python files compile successfully.",
+      "metrics": {
+        "checked_files": 5
+      }
+    },
+    {
+      "name": "Dependencies",
+      "status": "pass",
+      "message": "All packages declared in requirements.txt are importable.",
+      "metrics": {
+        "checked": 6
+      }
+    },
+    {
+      "name": "Question Bank",
+      "status": "pass",
+      "message": "Question bank structure looks valid.",
+      "metrics": {
+        "path": "C:\\Users\\katuk\\OneDrive\\Desktop\\projects\\vibe\\neet\\data\\questions.json",
+        "question_count": 767,
+        "usable_questions": 345,
+        "malformed_rows": 0,
+        "duplicate_ids": 0,
+        "rows_with_incomplete_options": 0
+      }
+    },
+    {
+      "name": "Study State",
+      "status": "pass",
+      "message": "State file structure is valid.",
+      "metrics": {
+        "path": "C:\\Users\\katuk\\OneDrive\\Desktop\\projects\\vibe\\neet\\data\\study_state.json",
+        "users": 1,
+        "answer_key_entries": 0,
+        "unknown_answer_key_entries": 0,
+        "user_shape_errors": 0
+      }
+    },
+    {
+      "name": "Scraped Papers",
+      "status": "pass",
+      "message": "Scraped paper artifacts look consistent.",
+      "metrics": {
+        "manifest_path": "C:\\Users\\katuk\\OneDrive\\Desktop\\projects\\vibe\\neet\\data\\neet_papers\\manifest.csv",
+        "summary_path": "C:\\Users\\katuk\\OneDrive\\Desktop\\projects\\vibe\\neet\\data\\neet_papers\\summary.json",
+        "papers_dir": "C:\\Users\\katuk\\OneDrive\\Desktop\\projects\\vibe\\neet\\data\\neet_papers\\papers",
+        "manifest_rows": 130,
+        "successful_rows": 130,
+        "files_on_disk": 130,
+        "missing_success_files": 0,
+        "scanned_pdf_headers": 30,
+        "bad_pdf_signatures": 0,
+        "status_counts": {
+          "ok": 63,
+          "exists": 67
+        },
+        "summary_mismatch": false,
+        "summary_error": null,
+        "deep_pdf_scan": false
+      }
+    },
+    {
+      "name": "Remote Source Metadata",
+      "status": "warn",
+      "message": "Remote source verification disabled.",
+      "metrics": {
+        "enabled": false
+      }
+    }
+  ],
+  "config": {
+    "deep_pdf_scan": false,
+    "pdf_sample_limit": 30,
+    "verify_remote_sources": false,
+    "remote_sample_limit": 0,
+    "remote_timeout_seconds": 20
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "generated_at": "2026-04-14T02:40:57+00:00",
+  "start_year": 2005,
+  "end_year": 2025,
+  "max_per_year": 12,
+  "downloaded_files": 130,
+  "years_with_at_least_one_paper": 21,
+  "manifest_rows": 130,
+  "papers_dir": "data\\neet_papers\\papers"
+}

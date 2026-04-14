@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+frontend/node_modules/
+frontend/dist/
+
+.env
+.streamlit/
+
+# Large local artifacts (not required for app runtime)
+NEET 13 Question paper.pdf
+data/neet_papers/papers/
