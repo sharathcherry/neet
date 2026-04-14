@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import importlib.metadata
 import importlib.util
 import json
 import re
@@ -106,15 +107,46 @@ def _verify_dependencies(project_root: Path) -> dict[str, Any]:
     # Package name -> import name mapping for common mismatches.
     import_map = {
         "beautifulsoup4": "bs4",
+        "python-dotenv": "dotenv",
     }
 
     checked = 0
     missing: list[str] = []
 
+    def _has_distribution(dist_name: str) -> bool:
+        candidate = str(dist_name or "").strip()
+        if not candidate:
+            return False
+        try:
+            importlib.metadata.distribution(candidate)
+            return True
+        except importlib.metadata.PackageNotFoundError:
+            return False
+        except Exception:
+            return False
+
     for package in packages:
-        module_name = import_map.get(package.lower(), package)
+        canonical = str(package).strip()
+        if not canonical:
+            continue
+
+        requirement_token = canonical.split(";", 1)[0].strip()
+        base_name = re.split(r"\[", requirement_token, maxsplit=1)[0].strip().lower()
+        module_name = import_map.get(base_name, base_name.replace("-", "_"))
+
         checked += 1
-        if importlib.util.find_spec(module_name) is None:
+
+        if importlib.util.find_spec(module_name) is not None:
+            continue
+
+        if _has_distribution(base_name) or _has_distribution(requirement_token):
+            continue
+
+        try:
+            # Last-resort import probe for environments where module specs are not exposed reliably.
+            __import__(module_name)
+            continue
+        except Exception:
             missing.append(package)
 
     if missing:
@@ -381,8 +413,13 @@ def _verify_scrape_artifacts(project_root: Path, deep_pdf_scan: bool = False, pd
     message = "Scraped paper artifacts look consistent."
 
     if missing_files > 0 or bad_pdf_signatures > 0:
-        overall_status = FAIL
-        message = "Some scraped PDFs are missing or malformed."
+        # Streamlit Cloud deployments may intentionally exclude heavy paper PDFs while keeping manifests.
+        if missing_files > 0 and len(disk_files) == 0 and bad_pdf_signatures == 0:
+            overall_status = WARN
+            message = "Scraped paper binaries are not present in this deployment; manifest checks completed."
+        else:
+            overall_status = FAIL
+            message = "Some scraped PDFs are missing or malformed."
 
     summary_mismatch = False
     if summary_error:
