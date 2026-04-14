@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import random
@@ -16,8 +17,6 @@ from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from verification import run_project_verification
-
 try:
     from groq import Groq
 except Exception:
@@ -30,6 +29,30 @@ DEFAULT_AI_MODEL = os.getenv("AI_GROQ_MODEL", "llama-3.3-70b-versatile")
 ALLOWED_SUBJECTS: tuple[str, ...] = ("Biology", "Botany", "Physics", "Zoology")
 _ALLOWED_SUBJECT_LOOKUP = {item.lower(): item for item in ALLOWED_SUBJECTS}
 _ALLOWED_SUBJECTS_LOWER: tuple[str, ...] = tuple(_ALLOWED_SUBJECT_LOOKUP.keys())
+
+
+def _run_project_verification_fresh(**kwargs: Any) -> dict[str, Any]:
+    verification_path = Path(__file__).resolve().parents[1] / "verification.py"
+    try:
+        spec = importlib.util.spec_from_file_location("neet_verification_runtime", verification_path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError(f"Cannot load verification module from {verification_path}")
+
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        runner = getattr(module, "run_project_verification", None)
+        if not callable(runner):
+            raise RuntimeError("run_project_verification is not defined in verification.py")
+
+        report = runner(**kwargs)
+        if isinstance(report, dict):
+            runtime = report.setdefault("runtime", {})
+            if isinstance(runtime, dict):
+                runtime["verification_file"] = str(verification_path)
+        return report
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Verification runtime load failed: {exc}")
 
 AUX_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS ui_attempts (
@@ -2757,7 +2780,7 @@ def review_flashcard(request: FlashcardReviewRequest) -> dict[str, Any]:
 
 @app.get("/api/verification/snapshot")
 def verification_snapshot() -> dict[str, Any]:
-    return run_project_verification(
+    return _run_project_verification_fresh(
         project_root=Path("."),
         deep_pdf_scan=False,
         pdf_sample_limit=20,
@@ -2767,7 +2790,7 @@ def verification_snapshot() -> dict[str, Any]:
 
 @app.post("/api/verification/run")
 def verification_run(config: dict[str, Any] = Body(default_factory=dict)) -> dict[str, Any]:
-    return run_project_verification(
+    return _run_project_verification_fresh(
         project_root=Path("."),
         deep_pdf_scan=bool(config.get("deep_pdf_scan", False)),
         pdf_sample_limit=int(config.get("pdf_sample_limit", 20) or 20),
